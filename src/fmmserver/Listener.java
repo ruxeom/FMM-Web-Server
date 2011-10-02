@@ -2,6 +2,7 @@ package fmmserver;
 
 import java.io.*;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Hashtable;
 import java.util.Scanner;
 
@@ -12,26 +13,39 @@ public class Listener
 	
 	public Listener(int port)
 	{
-		ServerSocket socket = null;
+		ServerSocket serversocket = null;
+		try
+		{
+			serversocket = new ServerSocket(port);
+		}
+		catch(IOException e)
+		{
+			System.out.println("Error while creating ServerSocket with parameter port: "+ port);
+			e.printStackTrace();
+			System.exit(1);
+		}
+		
 		Hashtable <String,String> mimetypes = new MimeTypes().getMimeHash();
+		Hashtable<Integer, String> statuscodes = new StatusCodes().getCodeHash();
 		while(true)
 		{
+			Socket clientsocket = null;
 			try 
 			{
-				socket = new ServerSocket(port);
-				socket.accept();
+				clientsocket = serversocket.accept();
 			} 
 			catch (IOException e) 
 			{
+				System.out.println("Error while attempting to accept a connection.");
 				e.printStackTrace();
 			}
-			//not sure of the parameters for the service thread
-			//new ServiceThread().start();
+			
+			new ServiceThread(clientsocket, mimetypes, statuscodes).start();
 		}
 	}
 	
 	public static void main(String arg[]) throws IOException
 	{
-		new MimeTypes().getMimeHash();
+		new Listener(80);
 	}
 }

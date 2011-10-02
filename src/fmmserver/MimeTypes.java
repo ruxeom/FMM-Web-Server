@@ -22,6 +22,7 @@ public class MimeTypes
 		}
 		catch(Exception e)
 		{
+			System.out.println("Error while trying to load MIME types.");
 			e.printStackTrace();
 		}
 		return table;
