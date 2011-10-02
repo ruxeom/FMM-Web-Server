@@ -12,7 +12,7 @@ public class MimeTypes
 		Hashtable<String,String> table = new Hashtable<String,String>();
 		try
 		{
-			Scanner scanner = new Scanner(new FileInputStream("mimetuple.txt"));
+			Scanner scanner = new Scanner(new FileInputStream("mimetable.txt"));
 			while(scanner.hasNextLine())
 			{
 				String[] line = scanner.nextLine().split("\t");
