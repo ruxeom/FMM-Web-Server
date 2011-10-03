@@ -8,8 +8,6 @@ import java.util.Scanner;
 
 public class Listener 
 {
-	//we need hashtables to handle MIME types and Status Codes
-	//they can be parameters for the handler as this Listener's variables or a class
 	
 	public Listener(int port)
 	{

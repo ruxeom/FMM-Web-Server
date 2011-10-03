@@ -3,7 +3,6 @@ package fmmserver;
 import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.URL;
-import java.nio.*;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.io.*;
@@ -15,6 +14,8 @@ public class ServiceThread extends Thread
 	Hashtable<String, String> mimetypes;
 	Hashtable<Integer, String> statuscodes;
 	Socket socket;
+	ArrayList<String> headers = new ArrayList<String>();
+	
 	
 	public ServiceThread(Socket socket, Hashtable<String, String> mimetypes, Hashtable<Integer, String> statuscodes)
 	{
@@ -27,23 +28,18 @@ public class ServiceThread extends Thread
 	{
 		try 
 		{
+			System.out.println("NEW THREAD");
 			InputStream is = socket.getInputStream();
 			InputStreamReader isr =  new InputStreamReader(is);
-			BufferedReader reader = new BufferedReader(isr);
-			String line = reader.readLine();
+			BufferedReader socketreader = new BufferedReader(isr);
+			String line = socketreader.readLine();
 			String[] commandline = line.split(" ");
 			if(commandline.length == 3)
-				evaluateCommand(commandline, reader);
+				evaluateCommand(commandline, socketreader);
+			else
+				headers.add(getStatusCode(400));
 			
-			//else
-				//answerBadRequest(reader);
-			/*while(!line.equals(""))
-			{
-				System.out.println(line);
-				line = reader.readLine();
-			}*/
-			//System.out.println("Termine");
-			reader.close();
+			socketreader.close();
 			socket.close();
 		} 
 		catch (IOException ioe) 
@@ -58,58 +54,70 @@ public class ServiceThread extends Thread
 		}
 	}
 	
-	public void evaluateCommand(String[] commandline, BufferedReader reader)
+	public void evaluateCommand(String[] commandline, BufferedReader socketreader)
 	{
 		String command = commandline[0].toLowerCase();
-		if(command.equals("get"))
-		{
-			serviceGet(commandline[1], reader);
-		}
-		else if(command.equals("head"))
-		{
-			//serviceHead();
-		}
-		else
-		{
-			//commandNotSupported();
-		}
-	}
-	
-	public void serviceGet(String path, BufferedReader reader)
-	{
-		//evaluatePath(path);
-		URL u;
-		BufferedWriter writer;
+		
 		try 
 		{
-			u = new URL("http", "localhost", 80, path);
-			File file = new File(".", u.getPath());
-			writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-			if(file.exists())
+			URL url = new URL("http", "localhost", this.socket.getLocalPort(), commandline[1]);
+			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+			File file = new File(".", url.getPath());
+			
+			if(command.equals("get"))
 			{
-				serviceHead(file, reader, writer);
+				serviceGet(file, socketreader, writer);
+			}
+			else if(command.equals("head"))
+			{
+				serviceHead(file, socketreader, writer);
 			}
 			else
 			{
-				//answerNotFound();
+				headers.add(getStatusCode(405));
+				writeHeaders(writer);
 			}
+			writer.flush();
 		} 
-		catch (MalformedURLException urle) 
+		catch (MalformedURLException e) 
 		{
-			//answerBadRequest();
-			urle.printStackTrace();
+			e.printStackTrace();
+		} 
+		catch (IOException e) 
+		{
+			e.printStackTrace();
 		}
-		catch (IOException ioe)
+		
+	}
+	
+	public void serviceGet(File file, BufferedReader socketreader, BufferedWriter writer)
+	{
+		//evaluatePath(path);
+		int status = serviceHead(file, socketreader, writer);
+		if(status > 0)
 		{
-			System.out.println("Error while creating the BufferedWriter.");
-			ioe.printStackTrace();
+			writeHeaders(writer);
+			if(status == 1)
+				writeFile(file, writer);
+		}
+		else
+		{
+			headers.add(getStatusCode(404));
+			writeHeaders(writer);
 		}
 	}
 	
-	public void serviceHead(File file, BufferedReader reader, BufferedWriter writer)
+	public int serviceHead(File file, BufferedReader reader, BufferedWriter writer)
 	{
-		ArrayList<String> headers = new ArrayList<String>();
-		headers.add("Server: FMM/0.1");
+		
+		if(file.exists())
+		{
+			headers.add(getStatusCode(200));
+			headers.add("Server: FMM/0.1");
+		}
+		else
+			return 0;		//It does not exist
+		
 		if(file.isFile())
 		{
 			String name = file.getName();
@@ -117,7 +125,11 @@ public class ServiceThread extends Thread
 			headers.add("Content-Type: "+ mimetypes.get(extension[extension.length-1]));
 			long filesize = getFileSize(file);
 			headers.add("Content-Length: "+filesize);
+			
+			return 1;		//It is a file
 		}
+		else
+			return 2;		//It is a directory
 	}
 	
 	public long getFileSize(File file)
@@ -142,5 +154,51 @@ public class ServiceThread extends Thread
 		}
 		
 		return filesize;
+	}
+	
+	public String getStatusCode(int code)
+	{
+		return new String("HTTP/1.0 " + code + " " + statuscodes.get(code));
+	}
+	
+	public void writeHeaders(BufferedWriter writer)
+	{
+		try
+		{
+			for(int i = 0; i < headers.size(); i++)
+			{
+				writer.write(headers.get(i));
+				writer.newLine();
+				System.out.println(headers.get(i));
+			}
+			writer.newLine();
+		}
+		catch(IOException ioe)
+		{
+			System.out.println("Error while trying to write the headers.");
+			ioe.printStackTrace();
+		}
+	}
+	
+	public void writeFile(File file, BufferedWriter writer)
+	{
+		try 
+		{
+			BufferedReader reader = new BufferedReader(new FileReader(file));
+			int data;
+			while((data = reader.read()) != -1)
+			{
+				writer.write(data);
+			}
+		} 
+		catch (FileNotFoundException fnfe) 
+		{
+			// Again, just to please the compiler
+			fnfe.printStackTrace();
+		}
+		catch (IOException ioe)
+		{
+			System.out.println("Error while reading/writing response content file.");
+		}
 	}
 }
