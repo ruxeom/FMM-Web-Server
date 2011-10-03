@@ -33,6 +33,7 @@ public class ServiceThread extends Thread
 			InputStreamReader isr =  new InputStreamReader(is);
 			BufferedReader socketreader = new BufferedReader(isr);
 			String line = socketreader.readLine();
+			System.out.println(line);
 			String[] commandline = line.split(" ");
 			if(commandline.length == 3)
 				evaluateCommand(commandline, socketreader);
